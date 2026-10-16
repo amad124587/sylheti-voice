@@ -288,9 +288,29 @@ $('p-save').onclick = async () => {
 };
 
 // ---------- boot ----------
+// Long lists come in pages ({total, items}); an older server that ignores limit returns the whole array.
+const PAGE = 1000;
+async function fetchSet(set){
+  const key = 'sents_' + set + '_v1';
+  try { const c = JSON.parse(ls.get(key) || 'null'); if (c && c.length) return c; } catch(e) {}
+  let all;
+  const first = await api('sentences', {set, offset: 0, limit: PAGE});
+  if (Array.isArray(first)) all = first;
+  else {
+    const pages = [first.items || []], offs = [];
+    for (let o = PAGE; o < first.total; o += PAGE) offs.push(o);
+    let got = pages[0].length;
+    const show = () => { if (set === cur && code) $('sentence').textContent = 'বাক্য লোড হচ্ছে… ' + BN(got) + ' / ' + BN(first.total); };
+    show();
+    const rest = await Promise.all(offs.map(o => api('sentences', {set, offset: o, limit: PAGE}).then(r => { got += (r.items || []).length; show(); return r.items || []; })));
+    all = pages.concat(rest).flat();
+  }
+  ls.set(key, JSON.stringify(all));
+  return all;
+}
 function loadSentences(){
-  api('sentences', {set:'B'}).then(d => { SETS.B = d; if (code) render(); }).catch(e => notice('সিলেটি বাক্য লোড করা গেল না: ' + e.message + ' পেজ reload করুন।'));
-  api('sentences', {set:'A'}).then(d => { SETS.A = d; if (code) render(); }).catch(e => notice('বাংলা/ইংরেজি বাক্য লোড করা গেল না: ' + e.message + ' পেজ reload করুন।'));
+  fetchSet('A').then(d => { SETS.A = d; if (code) render(); }).catch(e => notice('বাংলা/ইংরেজি বাক্য লোড করা গেল না: ' + e.message + ' পেজ reload করুন।'));
+  fetchSet('B').then(d => { SETS.B = d; if (code) render(); }).catch(e => notice('সিলেটি বাক্য লোড করা গেল না: ' + e.message + ' পেজ reload করুন।'));
 }
 function boot(){
   if (!apiUrl()) { $('setup').hidden = false; return; }
