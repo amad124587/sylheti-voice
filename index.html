@@ -270,7 +270,7 @@ async function pump(){
     (async () => {
       try {
         const data = await toB64(j.blob);
-        await api('save', {code, set:j.set, index:j.i, row:j.row, data, mime:j.mime, duration:j.dur});
+        await api('save', {code, set:j.set, index:j.i, row:j.i + 1, excel_row:j.row, data, mime:j.mime, duration:j.dur});
         queue.splice(queue.indexOf(j), 1); sendingNow[j.set].delete(j.i); done[j.set].add(j.i);
       } catch(e) {
         j.tries++; j.lastErr = (e && e.message) || String(e);
