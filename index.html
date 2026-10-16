@@ -89,6 +89,7 @@ ol{margin:0;padding-left:1.3em}
     <div class="card">
       <div class="meta"><span id="m-pos">লোড হচ্ছে…</span><span id="m-done"></span></div>
       <div class="bar"><i id="m-bar"></i></div>
+      <div id="q-status" class="status" hidden></div>
       <div id="m-state"></div>
       <div id="sentence" class="sentence">…</div>
       <div id="gloss" class="gloss"></div>
@@ -165,9 +166,9 @@ function render(){
   const n = S.length; pos[cur] = Math.max(0, Math.min(n-1, pos[cur]||0)); const i = pos[cur], it = S[i];
   $('sentence').textContent = it[1]; $('gloss').textContent = it[2] || '';
   $('m-pos').textContent = 'বাক্য ' + BN(i+1) + ' / ' + BN(n);
-  $('m-done').textContent = 'আপনি দিয়েছেন: ' + BN(done[cur].size);
-  $('m-bar').style.width = Math.min(100, done[cur].size / n * 100) + '%';
-  $('m-state').innerHTML = done[cur].has(i) ? '<span class="pill">✓ রেকর্ড করা আছে (আবার দিলে নতুনটা থাকবে)</span>' : '';
+  updateCounts();
+  $('m-state').innerHTML = done[cur].has(i) ? '<span class="pill">✓ রেকর্ড করা আছে (আবার দিলে নতুনটা থাকবে)</span>'
+    : sendingNow[cur].has(i) ? '<span class="pill">⏳ পাঠানো হচ্ছে…</span>' : '';
   $('b-prev').disabled = i === 0; $('b-next').disabled = i >= n-1; $('j-num').max = n;
   ls.set('pos_'+cur, i); ls.set('tab', cur);
 }
@@ -217,7 +218,6 @@ async function startRec(){
     const type = (mediaRec.mimeType || mime || 'audio/webm');
     const blob = new Blob(chunks, {type}); mediaRec = null;
     $('b-rec').textContent = '🎙️ আবার রেকর্ড'; $('b-rec').className = 'rec';
-    stream.getTracks().forEach(t => t.stop()); stream = null;   // turn the mic off between takes
     setPending(blob, type, dur);
   };
   mediaRec.start(); t0 = Date.now(); meter();
@@ -228,6 +228,8 @@ async function startRec(){
   st('রেকর্ড হচ্ছে… বাক্যটা পড়ুন, শেষ হলে "থামান" চাপুন।');
 }
 $('b-rec').onclick = () => { if (mediaRec) mediaRec.stop(); else startRec(); };
+// free the microphone when the page is in the background; it reopens on the next recording
+document.addEventListener('visibilitychange', () => { if (document.hidden && !mediaRec && stream) { stream.getTracks().forEach(t => t.stop()); stream = null; } });
 
 function setPending(blob, mime, dur){
   if (dur !== null && dur < 0.5){ st('রেকর্ডিং খুব ছোট। আবার রেকর্ড করুন।', 'err'); return; }
@@ -247,21 +249,56 @@ $('f-pick').onchange = async e => {
 };
 
 function toB64(blob){ return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = rej; r.readAsDataURL(blob); }); }
-$('b-send').onclick = async () => {
+// ---------- instant submit: uploads run in the background, the next sentence opens right away ----------
+const queue = [];            // {set, i, row, blob, mime, dur, tries, failed}
+let sending = 0;
+const sendingNow = {A:new Set(), B:new Set()};
+function qStatus(){
+  const left = queue.filter(j => !j.failed).length, bad = queue.filter(j => j.failed).length;
+  const el = $('q-status');
+  if (!left && !bad){ el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = (left ? '⏳ ' + BN(left) + 'টা পাঠানো হচ্ছে…' : '') +
+    (bad ? ' <span style="color:var(--err)">⚠ ' + BN(bad) + 'টা যায়নি</span> <button id="q-retry" style="min-height:32px;padding:4px 10px">আবার চেষ্টা</button>' : '');
+  const b = $('q-retry'); if (b) b.onclick = () => { queue.forEach(j => { j.failed = false; j.tries = 0; }); pump(); };
+}
+async function pump(){
+  qStatus();
+  while (sending < 2) {
+    const j = queue.find(x => !x.failed && !x.busy); if (!j) break;
+    j.busy = true; sending++; qStatus();
+    (async () => {
+      try {
+        const data = await toB64(j.blob);
+        await api('save', {code, set:j.set, index:j.i, row:j.row, data, mime:j.mime, duration:j.dur});
+        queue.splice(queue.indexOf(j), 1); sendingNow[j.set].delete(j.i); done[j.set].add(j.i);
+      } catch(e) {
+        j.tries++; j.lastErr = (e && e.message) || String(e);
+        if (j.tries >= 3) j.failed = true; else await new Promise(r => setTimeout(r, 1500 * j.tries));
+      }
+      j.busy = false; sending--;
+      if (cur === j.set && pos[cur] === j.i && !pending) render(); else updateCounts();
+      pump();
+    })();
+  }
+}
+function updateCounts(){
+  const S = SETS[cur]; if (!S) return;
+  const n = S.length, c = new Set([...done[cur], ...sendingNow[cur]]).size;
+  $('m-done').textContent = 'আপনি দিয়েছেন: ' + BN(c);
+  $('m-bar').style.width = Math.min(100, c / n * 100) + '%';
+}
+window.addEventListener('beforeunload', e => { if (queue.length || sending) { e.preventDefault(); e.returnValue = ''; } });
+
+$('b-send').onclick = () => {
   if (!pending || !code) return;
   const set = cur, i = pos[cur], it = SETS[set][i], p = pending;
-  $('b-send').disabled = true; st('জমা হচ্ছে…');
-  try {
-    const data = await toB64(p.blob);
-    const r = await api('save', {code, set, index:i, row:it[0], data, mime:p.mime, duration:p.dur});
-    done[set].add(i);
-    st('✓ জমা হয়েছে (' + r.name + ')।', 'ok');
-    $('b-send').hidden = true; pending = null;
-    if (cur === set && pos[set] === i && i < SETS[set].length - 1)
-      setTimeout(() => { if (cur === set && pos[set] === i && !mediaRec) { pos[set] = i + 1; render(); st('✓ আগেরটা জমা হয়েছে। এবার এই বাক্যটা।', 'ok'); } }, 900);
-    else render();
-  } catch(e){ st('জমা দেওয়া যায়নি: ' + (e && e.message || e) + ' আবার চেষ্টা করুন।', 'err'); }
-  $('b-send').disabled = false;
+  queue.push({set, i, row: it[0], blob: p.blob, mime: p.mime, dur: p.dur, tries: 0});
+  sendingNow[set].add(i);
+  pending = null;
+  if (i < SETS[set].length - 1) { pos[set] = i + 1; render(); st('✓ বাক্য ' + BN(i + 1) + ' জমা নেওয়া হয়েছে। এবার এই বাক্যটা।', 'ok'); }
+  else { render(); st('✓ জমা নেওয়া হয়েছে।', 'ok'); }
+  pump();
 };
 
 // ---------- navigation ----------
