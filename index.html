@@ -140,7 +140,7 @@ async function api(action, payload){
   const url = apiUrl();
   if (!url) throw new Error('Web app লিংক সেট করা নেই।');
   const res = await fetch(url, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
-                                body: JSON.stringify(Object.assign({action}, payload || {})), redirect:'follow'});
+                                body: JSON.stringify(Object.assign({action}, payload || {})), redirect:'follow', credentials:'omit'});
   if (!res.ok) throw new Error('সার্ভার সাড়া দেয়নি (' + res.status + ')');
   let j; try { j = await res.json(); } catch(e) { throw new Error('সার্ভারের উত্তর বোঝা যায়নি। Apps Script নতুন version-এ deploy করা আছে কিনা দেখুন।'); }
   if (!j.ok) throw new Error(j.error || 'অজানা সমস্যা');
