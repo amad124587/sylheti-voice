@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>সিলেটি কণ্ঠ সংগ্রহ</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Tiro+Bangla&display=swap">
+<style>
+:root{
+  --bg:#f5f6f1; --card:#fff; --ink:#1c2620; --muted:#5d6b62; --line:#d9dfd6;
+  --accent:#2f6b4f; --accent-ink:#fff; --soft:#e4efe8; --rec:#b3261e; --warn:#9a5b00; --warn-bg:#fff4e0; --err:#a3302a;
+  --f-body:"Hind Siliguri","Noto Sans Bengali",system-ui,sans-serif; --f-read:"Tiro Bangla","Hind Siliguri",serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#121814; --card:#1a221d; --ink:#e7ede8; --muted:#9aa9a0; --line:#2c3730;
+  --accent:#6fbf94; --accent-ink:#0d1a12; --soft:#21332a; --rec:#ff8a80; --warn:#f0b35a; --warn-bg:#2e2615; --err:#f08a80; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.55}
+.wrap{max-width:640px;margin:0 auto;padding:20px 16px 48px;display:flex;flex-direction:column;gap:16px}
+h1{font-size:1.6rem;margin:0;line-height:1.25} h2{font-size:1.15rem;margin:0} p{margin:0}
+.sub{color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.note{border-radius:10px;padding:10px 12px;background:var(--warn-bg);color:var(--warn);font-size:.95rem}
+label{font-weight:500;font-size:.95rem}
+.field{display:flex;flex-direction:column;gap:4px}
+input[type=text],input[type=number],input[type=url],select{font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);width:100%}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1 1 140px;min-width:0}
+.check{display:flex;gap:10px;align-items:flex-start;font-weight:400}
+.check input{width:22px;height:22px;margin-top:2px;flex:none;accent-color:var(--accent)}
+button,.btn{font:inherit;font-weight:600;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:12px 14px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;position:relative;text-align:center}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.rec{background:var(--rec);color:#fff;border-color:var(--rec)}
+button.recording{background:var(--card);color:var(--rec);border:2px solid var(--rec)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.btn input{position:absolute;width:1px;height:1px;opacity:0}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.tabs{display:flex;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px}
+.tabs button{flex:1;border:0;min-height:44px;background:transparent;font-size:.95rem}
+.tabs button[aria-selected=true]{background:var(--soft);color:var(--accent)}
+.meta{display:flex;justify-content:space-between;gap:8px;font-size:.9rem;color:var(--muted);flex-wrap:wrap}
+.sentence{font-family:var(--f-read);font-size:1.65rem;line-height:1.5;min-height:3em;overflow-wrap:anywhere}
+.gloss{color:var(--muted);font-size:.95rem}
+.bar{height:6px;border-radius:6px;background:var(--line);overflow:hidden}.bar i{display:block;height:100%;background:var(--accent);width:0}
+.status{font-size:.95rem;min-height:1.5em}.status.ok{color:var(--accent)}.status.err{color:var(--err)}
+.pill{display:inline-block;font-size:.8rem;font-weight:600;padding:2px 10px;border-radius:999px;background:var(--soft);color:var(--accent)}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+audio{width:100%}
+.timer{font-variant-numeric:tabular-nums;font-weight:700}
+.level{height:8px;border-radius:8px;background:var(--line);overflow:hidden}.level i{display:block;height:100%;width:0;background:var(--rec);transition:width .08s}
+details summary{cursor:pointer;font-weight:600}
+ol{margin:0;padding-left:1.3em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:6px">
+    <h1>সিলেটি কণ্ঠ সংগ্রহ</h1>
+    <p class="sub">সিলেটি speech-to-speech translation থিসিসের জন্য। পর্দার বাক্যটা পড়ে মাইকে রেকর্ড করুন, শুনে দেখে জমা দিন, তারপর পরের বাক্য। যতগুলো ইচ্ছা দিন, যেকোনো সময় থেমে পরে আবার চালিয়ে যেতে পারবেন।</p>
+  </header>
+  <div id="notice" class="note" hidden></div>
+
+  <!-- shown only to the owner when the API link is not set yet -->
+  <section id="setup" class="card" hidden>
+    <h2>প্রথমবারের সেটআপ</h2>
+    <p class="sub">Apps Script-এর Web app লিংকটা (যেটা <b>/exec</b> দিয়ে শেষ) এখানে দিন। একবার দিলেই এই ব্রাউজার মনে রাখবে। অন্যদের জন্য repo-র <b>config.js</b> ফাইলে বসিয়ে দিন।</p>
+    <div class="field"><label for="s-url">Web app লিংক</label><input id="s-url" type="url" placeholder="https://script.google.com/macros/s/…/exec"></div>
+    <button id="s-save" class="primary">সেভ করুন</button>
+  </section>
+
+  <section id="profile" class="card" hidden>
+    <h2>আপনার পরিচয় আর সম্মতি</h2>
+    <p class="sub">আসল নাম লাগবে না, নিজের একটা code বেছে নিন (যেমন rima01)। পরে বা অন্য ফোন থেকে একই code দিলে আগের জায়গা থেকে চালিয়ে যেতে পারবেন।</p>
+    <div class="field"><label for="p-code">আপনার speaker code</label><input id="p-code" type="text" autocomplete="off" placeholder="যেমন rima01" maxlength="24"></div>
+    <div class="row">
+      <div class="field"><label for="p-gender">লিঙ্গ</label><select id="p-gender"><option value="">বাছুন</option><option value="female">নারী</option><option value="male">পুরুষ</option><option value="other">অন্যান্য</option><option value="na">বলতে চাই না</option></select></div>
+      <div class="field"><label for="p-age">বয়সের দল</label><select id="p-age"><option value="">বাছুন</option><option>18-25</option><option>26-35</option><option>36-50</option><option>51+</option><option value="na">বলতে চাই না</option></select></div>
+    </div>
+    <div class="field"><label for="p-dist">কোন এলাকার সিলেটি (ঐচ্ছিক)</label><input id="p-dist" type="text" placeholder="যেমন সিলেট সদর, মৌলভীবাজার" maxlength="60"></div>
+    <label class="check"><input id="p-consent" type="checkbox"><span>আমি স্বেচ্ছায় আমার কণ্ঠ দিচ্ছি। আমি জানি এই রেকর্ডিং একটা থিসিস গবেষণায় (সিলেটি speech recognition, TTS আর voice cloning model তৈরি ও মূল্যায়ন) ব্যবহার হবে। আমি চাইলে যেকোনো সময় আমার রেকর্ডিং মুছে দিতে বলতে পারি।</span></label>
+    <div id="p-msg" class="status"></div>
+    <button id="p-save" class="primary">শুরু করুন</button>
+  </section>
+
+  <section id="rec" hidden style="display:flex;flex-direction:column;gap:12px">
+    <div class="tabs" role="tablist">
+      <button id="tab-B" role="tab" aria-selected="true">সিলেটি বাক্য (TTS)</button>
+      <button id="tab-A" role="tab" aria-selected="false">বাংলা/ইংরেজি (voice cloning)</button>
+    </div>
+    <div class="card">
+      <div class="meta"><span id="m-pos">লোড হচ্ছে…</span><span id="m-done"></span></div>
+      <div class="bar"><i id="m-bar"></i></div>
+      <div id="m-state"></div>
+      <div id="sentence" class="sentence">…</div>
+      <div id="gloss" class="gloss"></div>
+      <button id="b-rec" class="rec">🎙️ রেকর্ড শুরু</button>
+      <div class="level" id="lvl-wrap" hidden><i id="lvl"></i></div>
+      <label class="btn" for="f-pick">📁 ফোনের রেকর্ডার / ফাইল থেকে দিন<input id="f-pick" type="file" accept="audio/*"></label>
+      <audio id="player" controls hidden></audio>
+      <button id="b-send" class="primary" hidden>✓ জমা দিন</button>
+      <div id="r-status" class="status"></div>
+      <div class="grid3">
+        <button id="b-prev">← আগের</button>
+        <button id="b-skip">বাকি গুলোর প্রথমটা</button>
+        <button id="b-next">পরের →</button>
+      </div>
+      <div class="row" style="align-items:flex-end">
+        <div class="field"><label for="j-num">বাক্য নম্বরে যান</label><input id="j-num" type="number" min="1" inputmode="numeric"></div>
+        <button id="j-go" style="flex:0 0 auto">যান</button>
+      </div>
+    </div>
+    <details class="card"><summary>ভালো রেকর্ডিং-এর নিয়ম</summary>
+      <ol>
+        <li>শান্ত ঘরে রেকর্ড করুন, ফ্যান বন্ধ রাখুন।</li>
+        <li>ফোন মুখ থেকে প্রায় ২০ সেমি দূরে রাখুন, সব সময় একই ভাবে ধরুন।</li>
+        <li>"রেকর্ড শুরু" চাপার পর এক মুহূর্ত থেমে বাক্যটা স্বাভাবিক গতিতে পড়ুন, শেষে এক মুহূর্ত চুপ থেকে "থামান" চাপুন।</li>
+        <li>শুনে দেখুন। ঠিক না লাগলে আবার রেকর্ড করুন, ঠিক থাকলে "জমা দিন"।</li>
+        <li>প্রথমবার ব্রাউজার মাইকের অনুমতি চাইবে, Allow দিন।</li>
+      </ol>
+    </details>
+    <p id="who" class="sub" style="font-size:.9rem"></p>
+  </section>
+</div>
+
+<script src="config.js"></script>
+<script>
+// Apps Script Web app-এর /exec লিংক থাকে config.js ফাইলে
+const API_URL = (window.API_URL || "").trim();
+
+const $ = id => document.getElementById(id);
+const BN = n => String(n).replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[d]);
+const ls = {get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+
+function apiUrl(){
+  const q = new URLSearchParams(location.search).get('api');
+  if (q) ls.set('api', q);
+  return API_URL || q || ls.get('api') || '';
+}
+// Apps Script doPost: text/plain body avoids the CORS preflight; the reply is {ok, result} or {ok:false, error}
+async function api(action, payload){
+  const url = apiUrl();
+  if (!url) throw new Error('Web app লিংক সেট করা নেই।');
+  const res = await fetch(url, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+                                body: JSON.stringify(Object.assign({action}, payload || {})), redirect:'follow'});
+  if (!res.ok) throw new Error('সার্ভার সাড়া দেয়নি (' + res.status + ')');
+  let j; try { j = await res.json(); } catch(e) { throw new Error('সার্ভারের উত্তর বোঝা যায়নি। Apps Script নতুন version-এ deploy করা আছে কিনা দেখুন।'); }
+  if (!j.ok) throw new Error(j.error || 'অজানা সমস্যা');
+  return j.result;
+}
+
+const SETS = {A:null, B:null};
+let cur = ls.get('tab') === 'A' ? 'A' : 'B', pos = {A:+(ls.get('pos_A')||0), B:+(ls.get('pos_B')||0)};
+let code = null, done = {A:new Set(), B:new Set()};
+let pending = null;                 // {blob, mime, dur}
+let mediaRec = null, chunks = [], t0 = 0, tick = null, stream = null, actx = null, analyser = null, raf = null;
+const MAX_SEC = 30;
+
+function notice(t){ $('notice').textContent = t||''; $('notice').hidden = !t; }
+function st(t, k){ const e = $('r-status'); e.textContent = t||''; e.className = 'status' + (k?' '+k:''); }
+
+function render(){
+  const S = SETS[cur];
+  $('tab-A').setAttribute('aria-selected', cur==='A'); $('tab-B').setAttribute('aria-selected', cur==='B');
+  clearPending();
+  if (!S){ $('sentence').textContent = 'বাক্য লোড হচ্ছে…'; $('gloss').textContent=''; $('m-pos').textContent=''; return; }
+  const n = S.length; pos[cur] = Math.max(0, Math.min(n-1, pos[cur]||0)); const i = pos[cur], it = S[i];
+  $('sentence').textContent = it[1]; $('gloss').textContent = it[2] || '';
+  $('m-pos').textContent = 'বাক্য ' + BN(i+1) + ' / ' + BN(n);
+  $('m-done').textContent = 'আপনি দিয়েছেন: ' + BN(done[cur].size);
+  $('m-bar').style.width = Math.min(100, done[cur].size / n * 100) + '%';
+  $('m-state').innerHTML = done[cur].has(i) ? '<span class="pill">✓ রেকর্ড করা আছে (আবার দিলে নতুনটা থাকবে)</span>' : '';
+  $('b-prev').disabled = i === 0; $('b-next').disabled = i >= n-1; $('j-num').max = n;
+  ls.set('pos_'+cur, i); ls.set('tab', cur);
+}
+function go(i){ if (mediaRec) return; pos[cur] = i; render(); }
+function clearPending(){ pending = null; $('player').hidden = true; $('player').removeAttribute('src'); $('b-send').hidden = true; st(''); }
+
+// ---------- microphone recording ----------
+function pickMime(){
+  const c = ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus'];
+  if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return '';
+  return c.find(m => MediaRecorder.isTypeSupported(m)) || '';
+}
+function micError(e){
+  const n = e && e.name;
+  if (n === 'NotAllowedError' || n === 'SecurityError')
+    return 'মাইকের অনুমতি বন্ধ আছে। ঠিকানার বারের বাঁ পাশের 🔒/ⓘ চিহ্নে চেপে Microphone → Allow করুন, তারপর পেজ reload দিন।';
+  if (n === 'NotFoundError' || n === 'OverconstrainedError') return 'কোনো মাইক পাওয়া যায়নি। মাইক/হেডফোন লাগানো আছে কিনা দেখুন।';
+  if (n === 'NotReadableError') return 'মাইক অন্য কোনো অ্যাপ (কল, WhatsApp ইত্যাদি) ব্যবহার করছে। সেটা বন্ধ করে আবার চেষ্টা করুন।';
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)
+    return 'এই ব্রাউজারে মাইক চলে না। Chrome বা Safari-তে লিংকটা খুলুন (Facebook/Messenger-এর ভেতরের ব্রাউজারে নয়)।';
+  return 'মাইক চালু করা গেল না (' + (n || e) + ')। "ফোনের রেকর্ডার / ফাইল থেকে দিন" ব্যবহার করুন।';
+}
+function meter(){
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext; actx = actx || new AC();
+    if (actx.state === 'suspended') actx.resume();
+    const src = actx.createMediaStreamSource(stream); analyser = actx.createAnalyser(); analyser.fftSize = 512; src.connect(analyser);
+    const buf = new Uint8Array(analyser.fftSize); $('lvl-wrap').hidden = false;
+    const loop = () => { analyser.getByteTimeDomainData(buf); let m = 0; for (const v of buf) m = Math.max(m, Math.abs(v-128));
+      $('lvl').style.width = Math.min(100, m/128*160) + '%'; raf = requestAnimationFrame(loop); };
+    loop();
+  } catch(e) {}
+}
+async function startRec(){
+  if (!SETS[cur]) return;
+  clearPending();
+  try {
+    if (!stream || !stream.active) stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:true}});
+  } catch(e){ st(micError(e), 'err'); return; }
+  const mime = pickMime();
+  try { mediaRec = mime ? new MediaRecorder(stream, {mimeType: mime}) : new MediaRecorder(stream); }
+  catch(e){ st('এই ব্রাউজারে সরাসরি রেকর্ড হয় না। "ফোনের রেকর্ডার / ফাইল থেকে দিন" ব্যবহার করুন।', 'err'); return; }
+  chunks = [];
+  mediaRec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  mediaRec.onstop = () => {
+    const dur = (Date.now() - t0) / 1000; clearInterval(tick); cancelAnimationFrame(raf); $('lvl-wrap').hidden = true;
+    const type = (mediaRec.mimeType || mime || 'audio/webm');
+    const blob = new Blob(chunks, {type}); mediaRec = null;
+    $('b-rec').textContent = '🎙️ আবার রেকর্ড'; $('b-rec').className = 'rec';
+    stream.getTracks().forEach(t => t.stop()); stream = null;   // turn the mic off between takes
+    setPending(blob, type, dur);
+  };
+  mediaRec.start(); t0 = Date.now(); meter();
+  $('b-rec').innerHTML = '⏹ থামান <span class="timer" id="tm">০:০০</span>'; $('b-rec').className = 'recording';
+  tick = setInterval(() => { const s = Math.floor((Date.now()-t0)/1000); const el = $('tm');
+    if (el) el.textContent = BN(Math.floor(s/60)) + ':' + BN(String(s%60).padStart(2,'0'));
+    if (s >= MAX_SEC) mediaRec && mediaRec.stop(); }, 250);
+  st('রেকর্ড হচ্ছে… বাক্যটা পড়ুন, শেষ হলে "থামান" চাপুন।');
+}
+$('b-rec').onclick = () => { if (mediaRec) mediaRec.stop(); else startRec(); };
+
+function setPending(blob, mime, dur){
+  if (dur !== null && dur < 0.5){ st('রেকর্ডিং খুব ছোট। আবার রেকর্ড করুন।', 'err'); return; }
+  if (dur !== null && dur > MAX_SEC + 0.5){ st('রেকর্ডিং ৩০ সেকেন্ডের বেশি। শুধু এই একটা বাক্য রেকর্ড করুন।', 'err'); return; }
+  pending = {blob, mime, dur};
+  $('player').src = URL.createObjectURL(blob); $('player').hidden = false; $('b-send').hidden = false;
+  st('শুনে দেখুন। ঠিক থাকলে "জমা দিন", না হলে আবার রেকর্ড করুন।');
+}
+async function fileDuration(file){
+  try { const AC = window.AudioContext || window.webkitAudioContext; const ctx = new AC();
+    const b = await ctx.decodeAudioData(await file.arrayBuffer()); try{ctx.close()}catch(e){} return b.duration; } catch(e){ return null; }
+}
+$('f-pick').onchange = async e => {
+  const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f || !SETS[cur]) return;
+  clearPending(); st('যাচাই হচ্ছে…');
+  setPending(f, f.type || ('audio/' + ((f.name.split('.').pop()||'').toLowerCase() || 'unknown')), await fileDuration(f));
+};
+
+function toB64(blob){ return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = rej; r.readAsDataURL(blob); }); }
+$('b-send').onclick = async () => {
+  if (!pending || !code) return;
+  const set = cur, i = pos[cur], it = SETS[set][i], p = pending;
+  $('b-send').disabled = true; st('জমা হচ্ছে…');
+  try {
+    const data = await toB64(p.blob);
+    const r = await api('save', {code, set, index:i, row:it[0], data, mime:p.mime, duration:p.dur});
+    done[set].add(i);
+    st('✓ জমা হয়েছে (' + r.name + ')।', 'ok');
+    $('b-send').hidden = true; pending = null;
+    if (cur === set && pos[set] === i && i < SETS[set].length - 1)
+      setTimeout(() => { if (cur === set && pos[set] === i && !mediaRec) { pos[set] = i + 1; render(); st('✓ আগেরটা জমা হয়েছে। এবার এই বাক্যটা।', 'ok'); } }, 900);
+    else render();
+  } catch(e){ st('জমা দেওয়া যায়নি: ' + (e && e.message || e) + ' আবার চেষ্টা করুন।', 'err'); }
+  $('b-send').disabled = false;
+};
+
+// ---------- navigation ----------
+$('b-prev').onclick = () => go(pos[cur]-1);
+$('b-next').onclick = () => go(pos[cur]+1);
+$('j-go').onclick = () => { const v = parseInt($('j-num').value,10); if (v>0) go(v-1); };
+$('b-skip').onclick = () => { const S = SETS[cur]; if (!S) return; for (let i=0;i<S.length;i++) if (!done[cur].has(i)) return go(i); st('এই ভাগের সব বাক্য রেকর্ড করা হয়ে গেছে। ধন্যবাদ!', 'ok'); };
+$('tab-A').onclick = () => { if (mediaRec) return; cur='A'; render(); };
+$('tab-B').onclick = () => { if (mediaRec) return; cur='B'; render(); };
+
+// ---------- profile ----------
+function begin(prog){
+  code = prog.code; ls.set('spk', code);
+  done = {A:new Set(prog.A), B:new Set(prog.B)};
+  $('profile').hidden = true; $('rec').hidden = false;
+  $('who').textContent = 'Speaker code: ' + code + ' · পরে বা অন্য ফোন থেকে একই code দিলে এখান থেকেই চালিয়ে যেতে পারবেন।';
+  render();
+}
+$('p-save').onclick = async () => {
+  const m = $('p-msg'); m.className = 'status'; m.textContent = 'সংরক্ষণ হচ্ছে…'; $('p-save').disabled = true;
+  try { begin(await api('register', {code:$('p-code').value, gender:$('p-gender').value, age:$('p-age').value, district:$('p-dist').value, consent:$('p-consent').checked})); }
+  catch(e){ m.className = 'status err'; m.textContent = (e && e.message) || 'সংরক্ষণ করা গেল না।'; }
+  $('p-save').disabled = false;
+};
+
+// ---------- boot ----------
+function loadSentences(){
+  api('sentences', {set:'B'}).then(d => { SETS.B = d; if (code) render(); }).catch(e => notice('সিলেটি বাক্য লোড করা গেল না: ' + e.message + ' পেজ reload করুন।'));
+  api('sentences', {set:'A'}).then(d => { SETS.A = d; if (code) render(); }).catch(e => notice('বাংলা/ইংরেজি বাক্য লোড করা গেল না: ' + e.message + ' পেজ reload করুন।'));
+}
+function boot(){
+  if (!apiUrl()) { $('setup').hidden = false; return; }
+  $('setup').hidden = true;
+  const saved = ls.get('spk'); if (saved) $('p-code').value = saved;
+  $('profile').hidden = false;
+  if (!window.isSecureContext) notice('মাইক চালাতে পেজটা https লিংকে খুলতে হবে।');
+  loadSentences();
+}
+$('s-save').onclick = () => { const v = $('s-url').value.trim(); if (!/^https:\/\/script\.google\.com\/.+\/exec/.test(v)) { $('s-url').focus(); $('s-url').setCustomValidity('লিংকটা https://script.google.com/… দিয়ে শুরু আর /exec দিয়ে শেষ হতে হবে'); $('s-url').reportValidity(); return; } ls.set('api', v); boot(); };
+boot();
+</script>
+</body>
+</html>
