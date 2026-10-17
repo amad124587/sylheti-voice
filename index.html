@@ -218,7 +218,8 @@ async function startRec(){
     const type = (mediaRec.mimeType || mime || 'audio/webm');
     const blob = new Blob(chunks, {type}); mediaRec = null;
     $('b-rec').textContent = '🎙️ আবার রেকর্ড'; $('b-rec').className = 'rec';
-    setPending(blob, type, dur);
+    st('প্রস্তুত হচ্ছে…');
+    louden(blob).then(w => w ? setPending(w.blob, 'audio/wav', w.dur) : setPending(blob, type, dur));
   };
   mediaRec.start(); t0 = Date.now(); meter();
   $('b-rec').innerHTML = '⏹ থামান <span class="timer" id="tm">০:০০</span>'; $('b-rec').className = 'recording';
@@ -230,6 +231,32 @@ async function startRec(){
 $('b-rec').onclick = () => { if (mediaRec) mediaRec.stop(); else startRec(); };
 // free the microphone when the page is in the background; it reopens on the next recording
 document.addEventListener('visibilitychange', () => { if (document.hidden && !mediaRec && stream) { stream.getTracks().forEach(t => t.stop()); stream = null; } });
+
+// ---------- make the take loud and clear: mono 16 kHz WAV, peak normalised ----------
+const TARGET_SR = 16000, TARGET_PEAK = 0.89, MAX_GAIN = 12;
+async function louden(blob){
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext; const ctx = new AC();
+    const src = await ctx.decodeAudioData(await blob.arrayBuffer()); try { ctx.close(); } catch(e) {}
+    const len = Math.max(1, Math.ceil(src.duration * TARGET_SR));
+    const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const off = new OAC(1, len, TARGET_SR);                         // mono, resampled by the browser
+    const node = off.createBufferSource(); node.buffer = src; node.connect(off.destination); node.start(0);
+    const out = await off.startRendering();
+    const x = out.getChannelData(0);
+    let peak = 0; for (let i = 0; i < x.length; i++) { const a = Math.abs(x[i]); if (a > peak) peak = a; }
+    if (peak < 1e-4) return null;                                   // silence: keep the original
+    const g = Math.min(MAX_GAIN, TARGET_PEAK / peak);
+    const buf = new ArrayBuffer(44 + x.length * 2), v = new DataView(buf);
+    const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + x.length * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, TARGET_SR, true); v.setUint32(28, TARGET_SR * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    w(36, 'data'); v.setUint32(40, x.length * 2, true);
+    for (let i = 0, o = 44; i < x.length; i++, o += 2) { const y = Math.max(-1, Math.min(1, x[i] * g)); v.setInt16(o, y < 0 ? y * 0x8000 : y * 0x7FFF, true); }
+    return { blob: new Blob([buf], {type: 'audio/wav'}), dur: src.duration };
+  } catch(e) { return null; }
+}
 
 function setPending(blob, mime, dur){
   if (dur !== null && dur < 0.5){ st('রেকর্ডিং খুব ছোট। আবার রেকর্ড করুন।', 'err'); return; }
@@ -245,7 +272,9 @@ async function fileDuration(file){
 $('f-pick').onchange = async e => {
   const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f || !SETS[cur]) return;
   clearPending(); st('যাচাই হচ্ছে…');
-  setPending(f, f.type || ('audio/' + ((f.name.split('.').pop()||'').toLowerCase() || 'unknown')), await fileDuration(f));
+  const w = await louden(f);
+  if (w) setPending(w.blob, 'audio/wav', w.dur);
+  else setPending(f, f.type || ('audio/' + ((f.name.split('.').pop()||'').toLowerCase() || 'unknown')), await fileDuration(f));
 };
 
 function toB64(blob){ return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = rej; r.readAsDataURL(blob); }); }
